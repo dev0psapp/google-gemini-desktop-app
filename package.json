@@ -25,7 +25,10 @@
     "ai-assistant",
     "chatbot"
   ],
-  "author": "",
+  "author": {
+    "name": "Gemini Desktop App",
+    "email": "gemini-desktop-app@example.com"
+  },
   "license": "MIT",
   "devDependencies": {
     "electron": "^32.0.0",
@@ -123,7 +126,8 @@
         }
       ],
       "icon": "build/icon.png",
-      "category": "Utility"
+      "category": "Utility",
+      "maintainer": "gemini-desktop-app@example.com"
     },
     "nsis": {
       "oneClick": false,
