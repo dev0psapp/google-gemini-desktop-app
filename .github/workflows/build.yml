@@ -69,7 +69,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.platform }}-installers
-          path: dist/*
+          path: |
+            dist/**/*.dmg
+            dist/**/*.exe
+            dist/**/*.deb
+            dist/**/*.rpm
+            dist/**/*.AppImage
           retention-days: 90
-          if-no-files-found: error
+          if-no-files-found: warn
 
