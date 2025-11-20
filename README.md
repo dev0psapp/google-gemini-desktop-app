@@ -14,16 +14,20 @@ Cross-platform desktop application for Google Gemini AI - Windows, macOS, and Li
 
 ### Windows
 - **NSIS Installer** (.exe) - Full installer with x64 and ARM64 support
-- **Portable** (.exe) - Portable version, no installation needed
 
 ### macOS
 - **DMG** - Disk image installer with x64 and ARM64 support
-- **ZIP** - Archive format with x64 and ARM64 support
+
+**Note**: Since the app is not code-signed, macOS Gatekeeper may block it. After opening the DMG and copying the app to Applications, you may need to remove the quarantine attribute:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Gemini.app
+```
+
+Or right-click the app and select "Open" instead of double-clicking, then confirm the security warning.
 
 ### Linux
-- **AppImage** - Universal Linux format (x64 and ARM64)
 - **DEB** - Debian/Ubuntu package (x64 and ARM64)
-- **RPM** - Red Hat/Fedora package (x64 and ARM64)
 
 ## Development
 
@@ -57,9 +61,9 @@ docker run -v $(pwd)/dist:/app/dist gemini-electron
 
 ### Build Workflow
 The workflow automatically builds for all platforms on push to main/master branch and creates artifacts:
-- `win-installers` - Windows NSIS and Portable installers
-- `mac-installers` - macOS DMG and ZIP files
-- `linux-installers` - Linux AppImage, DEB, and RPM packages
+- `win-installers` - Windows NSIS installers (.exe)
+- `mac-installers` - macOS DMG files
+- `linux-installers` - Linux DEB packages
 
 All artifacts are available for 90 days and can be downloaded from the Actions tab.
 

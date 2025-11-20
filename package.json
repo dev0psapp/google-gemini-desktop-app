@@ -10,7 +10,8 @@
     "build:mac": "electron-builder --mac --x64 --arm64",
     "build:linux": "electron-builder --linux --x64 --arm64",
     "build:all": "electron-builder --win --mac --linux --x64 --arm64",
-    "generate-icons": "./scripts/generate-icons.sh"
+    "generate-icons": "./scripts/generate-icons.sh",
+    "remove-quarantine": "./scripts/remove-quarantine.sh dist/mac/Gemini.app || ./scripts/remove-quarantine.sh dist/mac-arm64/Gemini.app || true"
   },
   "keywords": [
     "google-gemini",
@@ -48,6 +49,7 @@
     },
     "compression": "maximum",
     "asar": true,
+    "afterPack": "./scripts/after-pack.js",
     "files": [
       "main.js",
       "preload.js",
