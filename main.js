@@ -1,7 +1,46 @@
 const { app, BrowserWindow, shell, protocol } = require('electron');
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
 
 let mainWindow;
+
+// Get path for storing app data
+const userDataPath = app.getPath('userData');
+const stateFile = path.join(userDataPath, 'window-state.json');
+
+// Load saved window state
+function loadWindowState() {
+  try {
+    if (fs.existsSync(stateFile)) {
+      const data = fs.readFileSync(stateFile, 'utf8');
+      return JSON.parse(data);
+    }
+  } catch (error) {
+    console.error('Error loading window state:', error);
+  }
+  return null;
+}
+
+// Save window state
+function saveWindowState() {
+  if (!mainWindow) return;
+  
+  try {
+    const bounds = mainWindow.getBounds();
+    const state = {
+      x: bounds.x,
+      y: bounds.y,
+      width: bounds.width,
+      height: bounds.height,
+      isMaximized: mainWindow.isMaximized(),
+      isFullScreen: mainWindow.isFullScreen()
+    };
+    fs.writeFileSync(stateFile, JSON.stringify(state, null, 2));
+  } catch (error) {
+    console.error('Error saving window state:', error);
+  }
+}
 
 // Register custom protocol handler
 function registerProtocol() {
@@ -15,19 +54,52 @@ function registerProtocol() {
 }
 
 function createWindow() {
-  mainWindow = new BrowserWindow({
+  // Load saved window state
+  const savedState = loadWindowState();
+  
+  // Default window options
+  const defaultOptions = {
     width: 1400,
     height: 900,
+    minWidth: 800,
+    minHeight: 600,
+    show: false, // Don't show until ready
+    backgroundColor: '#ffffff',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
       webSecurity: true,
-      partition: 'persist:gemini'
+      partition: 'persist:gemini',
+      backgroundThrottling: false, // Keep running in background
+      cache: true // Enable caching
     },
     icon: path.join(__dirname, 'build', 'icon.png')
-  });
+  };
+
+  // Apply saved state if available
+  if (savedState) {
+    if (savedState.isMaximized) {
+      defaultOptions.width = savedState.width || 1400;
+      defaultOptions.height = savedState.height || 900;
+    } else {
+      defaultOptions.x = savedState.x;
+      defaultOptions.y = savedState.y;
+      defaultOptions.width = savedState.width || 1400;
+      defaultOptions.height = savedState.height || 900;
+    }
+  }
+
+  mainWindow = new BrowserWindow(defaultOptions);
   
+  // Show window when ready to prevent white flash
+  mainWindow.once('ready-to-show', () => {
+    if (savedState && savedState.isMaximized) {
+      mainWindow.maximize();
+    }
+    mainWindow.show();
+  });
+
   // Enable WebAuthn/Passkey support - allow all permissions for authentication
   mainWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
     // Allow all authentication-related permissions
@@ -40,18 +112,69 @@ function createWindow() {
     }
   });
 
-  // Allow all navigation - let Google handle authentication in the Electron window
-  // The persist:gemini partition will automatically save cookies and session data
-  // Note: Passkey may show errors in development mode, but will work in built app
+  // Configure cache for faster loading
+  mainWindow.webContents.session.webRequest.onBeforeRequest((details, callback) => {
+    // Allow all requests
+    callback({});
+  });
 
-  // Load Gemini website
-  mainWindow.loadURL('https://gemini.google.com/app');
+  // Load local HTML first (loading screen)
+  mainWindow.loadFile('index.html');
 
-  // Session persistence is automatic with persist: partition
-  // Cookies, localStorage, and sessionStorage are automatically saved and restored
+  // After a short delay, load the actual Gemini page
+  // This allows the loading screen to show first
+  setTimeout(() => {
+    mainWindow.webContents.loadURL('https://gemini.google.com/app', {
+      userAgent: mainWindow.webContents.getUserAgent()
+    });
+  }, 100);
+
+  // Handle navigation to preserve state
+  mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
+    // Allow navigation within Gemini domain
+    if (navigationUrl.includes('gemini.google.com')) {
+      return;
+    }
+    // Prevent navigation to external sites in the same window
+    if (!navigationUrl.includes('gemini.google.com')) {
+      event.preventDefault();
+      shell.openExternal(navigationUrl);
+    }
+  });
+
+  // Save window state on move/resize
+  let saveStateTimeout;
+  const debounceSaveState = () => {
+    clearTimeout(saveStateTimeout);
+    saveStateTimeout = setTimeout(() => {
+      saveWindowState();
+    }, 500);
+  };
+
+  mainWindow.on('move', debounceSaveState);
+  mainWindow.on('resize', debounceSaveState);
+  mainWindow.on('maximize', saveWindowState);
+  mainWindow.on('unmaximize', saveWindowState);
+  mainWindow.on('enter-full-screen', saveWindowState);
+  mainWindow.on('leave-full-screen', saveWindowState);
+
+  // Save state before closing
+  mainWindow.on('close', () => {
+    saveWindowState();
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+  });
+
+  // Handle page load events
+  mainWindow.webContents.on('did-finish-load', () => {
+    // Inject CSS to hide white flash
+    mainWindow.webContents.insertCSS(`
+      body {
+        background-color: #ffffff !important;
+      }
+    `);
   });
 }
 
