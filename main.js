@@ -54,6 +54,13 @@ function registerProtocol() {
 }
 
 function createWindow() {
+  // Don't create new window if one already exists
+  if (mainWindow) {
+    mainWindow.show();
+    mainWindow.focus();
+    return;
+  }
+
   // Load saved window state
   const savedState = loadWindowState();
   
@@ -118,16 +125,21 @@ function createWindow() {
     callback({});
   });
 
-  // Load local HTML first (loading screen)
-  mainWindow.loadFile('index.html');
+  // Check if window already has content loaded (from previous session)
+  const currentURL = mainWindow.webContents.getURL();
+  if (!currentURL || currentURL === 'about:blank' || currentURL.includes('index.html')) {
+    // Load local HTML first (loading screen) only if window is empty
+    mainWindow.loadFile('index.html');
 
-  // After a short delay, load the actual Gemini page
-  // This allows the loading screen to show first
-  setTimeout(() => {
-    mainWindow.webContents.loadURL('https://gemini.google.com/app', {
-      userAgent: mainWindow.webContents.getUserAgent()
-    });
-  }, 100);
+    // After a short delay, load the actual Gemini page
+    // This allows the loading screen to show first
+    setTimeout(() => {
+      mainWindow.webContents.loadURL('https://gemini.google.com/app', {
+        userAgent: mainWindow.webContents.getUserAgent()
+      });
+    }, 100);
+  }
+  // If window already has content, don't reload - preserve state
 
   // Handle navigation to preserve state
   mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
@@ -158,24 +170,23 @@ function createWindow() {
   mainWindow.on('enter-full-screen', saveWindowState);
   mainWindow.on('leave-full-screen', saveWindowState);
 
-  // Save state before closing
-  mainWindow.on('close', () => {
+  // Handle window close - on macOS, hide instead of closing
+  mainWindow.on('close', (event) => {
     saveWindowState();
+    
+    // On macOS, hide the window instead of closing it
+    // This preserves the window state and prevents reload
+    if (process.platform === 'darwin') {
+      event.preventDefault();
+      mainWindow.hide();
+    }
   });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
 
-  // Handle page load events
-  mainWindow.webContents.on('did-finish-load', () => {
-    // Inject CSS to hide white flash
-    mainWindow.webContents.insertCSS(`
-      body {
-        background-color: #ffffff !important;
-      }
-    `);
-  });
+  // Handle page load events - removed CSS injection that was causing white background
 }
 
 // Handle protocol URLs (deep links)
@@ -195,7 +206,11 @@ app.whenReady().then(() => {
   createWindow();
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
+    // On macOS, show existing window instead of creating new one
+    if (mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+    } else {
       createWindow();
     }
   });
