@@ -6,7 +6,23 @@ on:
       - 'v*'
 
 jobs:
+  extract-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.tag_version.outputs.version }}
+      tag: ${{ steps.tag_version.outputs.tag }}
+    steps:
+      - name: Extract version from tag
+        id: tag_version
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          VERSION=${TAG_NAME#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "Extracted version: $VERSION from tag: $TAG_NAME"
+
   build-linux:
+    needs: extract-version
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -17,6 +33,12 @@ jobs:
         with:
           node-version: '24.11.1'
           cache: 'npm'
+
+      - name: Update package.json version
+        run: |
+          VERSION="${{ needs.extract-version.outputs.version }}"
+          npm version $VERSION --no-git-tag-version
+          echo "Updated package.json version to $VERSION"
 
       - name: Install dependencies
         run: npm ci
@@ -33,11 +55,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: linux-installers
-          path: dist/*
+          path: |
+            dist/**/*.deb
           retention-days: 90
           if-no-files-found: error
 
   build-windows:
+    needs: extract-version
     runs-on: windows-latest
     steps:
       - name: Checkout code
@@ -48,6 +72,12 @@ jobs:
         with:
           node-version: '24.11.1'
           cache: 'npm'
+
+      - name: Update package.json version
+        run: |
+          $VERSION = "${{ needs.extract-version.outputs.version }}"
+          npm version $VERSION --no-git-tag-version
+          Write-Host "Updated package.json version to $VERSION"
 
       - name: Install dependencies
         run: npm ci
@@ -64,11 +94,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: win-installers
-          path: dist/*
+          path: |
+            dist/**/*.exe
           retention-days: 90
           if-no-files-found: error
 
   build-macos:
+    needs: extract-version
     runs-on: macos-latest
     steps:
       - name: Checkout code
@@ -80,6 +112,12 @@ jobs:
           node-version: '24.11.1'
           cache: 'npm'
 
+      - name: Update package.json version
+        run: |
+          VERSION="${{ needs.extract-version.outputs.version }}"
+          npm version $VERSION --no-git-tag-version
+          echo "Updated package.json version to $VERSION"
+
       - name: Install dependencies
         run: npm ci
 
@@ -87,10 +125,7 @@ jobs:
         run: npm run build:mac
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: List build artifacts
         run: ls -lah dist/
@@ -99,12 +134,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mac-installers
-          path: dist/*
+          path: |
+            dist/**/*.dmg
           retention-days: 90
           if-no-files-found: error
 
   create-release:
-    needs: [build-linux, build-windows, build-macos]
+    needs: [extract-version, build-linux, build-windows, build-macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -120,10 +156,22 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ needs.extract-version.outputs.tag }}
+          name: Release ${{ needs.extract-version.outputs.version }}
           files: artifacts/**/*
           draft: false
           prerelease: false
           generate_release_notes: true
+          body: |
+            ## Version ${{ needs.extract-version.outputs.version }}
+            
+            ### Installers
+            - **Windows**: `.exe` installer (x64 & ARM64)
+            - **macOS**: `.dmg` disk image (x64 & ARM64)
+            - **Linux**: `.deb` package (x64 & ARM64)
+            
+            ### Changes
+            See the commit history for detailed changes.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

@@ -1,9 +1,10 @@
-const { app, BrowserWindow, shell, protocol } = require('electron');
+const { app, BrowserWindow, shell, protocol, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
 let mainWindow;
+let isQuitting = false;
 
 // Get path for storing app data
 const userDataPath = app.getPath('userData');
@@ -170,13 +171,13 @@ function createWindow() {
   mainWindow.on('enter-full-screen', saveWindowState);
   mainWindow.on('leave-full-screen', saveWindowState);
 
-  // Handle window close - on macOS, hide instead of closing
+  // Handle window close - on macOS, hide instead of closing unless quitting
   mainWindow.on('close', (event) => {
     saveWindowState();
     
-    // On macOS, hide the window instead of closing it
+    // On macOS, hide the window instead of closing it (unless quitting)
     // This preserves the window state and prevents reload
-    if (process.platform === 'darwin') {
+    if (process.platform === 'darwin' && !isQuitting) {
       event.preventDefault();
       mainWindow.hide();
     }
@@ -201,8 +202,73 @@ app.on('open-url', (event, url) => {
   }
 });
 
+// Create application menu (macOS)
+function createMenu() {
+  if (process.platform === 'darwin') {
+    const template = [
+      {
+        label: app.getName(),
+        submenu: [
+          { role: 'about', label: 'About ' + app.getName() },
+          { type: 'separator' },
+          { role: 'services', label: 'Services' },
+          { type: 'separator' },
+          { role: 'hide', label: 'Hide ' + app.getName() },
+          { role: 'hideOthers', label: 'Hide Others' },
+          { role: 'unhide', label: 'Show All' },
+          { type: 'separator' },
+          {
+            label: 'Quit',
+            accelerator: 'Command+Q',
+            click: () => {
+              isQuitting = true;
+              app.quit();
+            }
+          }
+        ]
+      },
+      {
+        label: 'Edit',
+        submenu: [
+          { role: 'undo', label: 'Undo' },
+          { role: 'redo', label: 'Redo' },
+          { type: 'separator' },
+          { role: 'cut', label: 'Cut' },
+          { role: 'copy', label: 'Copy' },
+          { role: 'paste', label: 'Paste' },
+          { role: 'selectAll', label: 'Select All' }
+        ]
+      },
+      {
+        label: 'View',
+        submenu: [
+          { role: 'reload', label: 'Reload' },
+          { role: 'forceReload', label: 'Force Reload' },
+          { role: 'toggleDevTools', label: 'Toggle Developer Tools' },
+          { type: 'separator' },
+          { role: 'resetZoom', label: 'Actual Size' },
+          { role: 'zoomIn', label: 'Zoom In' },
+          { role: 'zoomOut', label: 'Zoom Out' },
+          { type: 'separator' },
+          { role: 'togglefullscreen', label: 'Toggle Full Screen' }
+        ]
+      },
+      {
+        label: 'Window',
+        submenu: [
+          { role: 'minimize', label: 'Minimize' },
+          { role: 'close', label: 'Close' }
+        ]
+      }
+    ];
+    const menu = Menu.buildFromTemplate(template);
+    Menu.setApplicationMenu(menu);
+  }
+}
+
 app.whenReady().then(() => {
   registerProtocol();
+  createMenu();
   createWindow();
 
   app.on('activate', () => {
@@ -216,8 +282,21 @@ app.whenReady().then(() => {
   });
 });
 
+// Handle quit (CMD+Q or Quit menu)
+app.on('before-quit', (event) => {
+  isQuitting = true;
+  saveWindowState();
+});
+
+app.on('will-quit', (event) => {
+  // Ensure we quit properly
+  isQuitting = true;
+});
+
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
+  // On macOS, don't quit when all windows are closed (unless explicitly quitting)
+  // This allows the app to stay in the dock
+  if (process.platform !== 'darwin' || isQuitting) {
     app.quit();
   }
 });

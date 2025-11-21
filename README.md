@@ -50,34 +50,41 @@ npm run build:linux
 npm run build:all
 ```
 
-## Docker Build
+## Contributing
 
-```bash
-docker build -t gemini-electron .
-docker run -v $(pwd)/dist:/app/dist gemini-electron
-```
+Contributions are welcome! If you'd like to contribute to this project:
 
-## GitHub Actions
+1. **Fork the repository** - Click the "Fork" button at the top of the page
+2. **Create a feature branch** - Create a new branch for your changes
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+3. **Make your changes** - Write your code and test it thoroughly
+4. **Commit your changes** - Write clear commit messages
+   ```bash
+   git commit -m "Add: your feature description"
+   ```
+5. **Push to your fork** - Push your changes to your forked repository
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+6. **Create a Pull Request** - Open a pull request from your fork to the main repository
 
-### Build Workflow
-The workflow automatically builds for all platforms on push to main/master branch and creates artifacts:
-- `win-installers` - Windows NSIS installers (.exe)
-- `mac-installers` - macOS DMG files
-- `linux-installers` - Linux DEB packages
+### Development Guidelines
 
-All artifacts are available for 90 days and can be downloaded from the Actions tab.
+- Follow the existing code style
+- Add comments for complex logic
+- Test your changes before submitting
+- Update documentation if needed
 
-### Release Workflow
-When you create a git tag starting with `v` (e.g., `v1.0.0`), the release workflow:
-1. Builds installers for all platforms
-2. Creates a GitHub Release
-3. Attaches all installer files to the release
+## Forking
 
-To create a release:
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
+Feel free to fork this repository and customize it for your own needs! When forking:
+
+1. **Update package.json** - Change the name, description, and author information
+2. **Update app metadata** - Modify `main.js` and build configuration as needed
+3. **Customize icons** - Replace icons in the `build/` directory with your own
+4. **Update README** - Update this README with your project information
 
 ## Requirements
 
@@ -93,3 +100,12 @@ Place your application icons in the `build/` directory:
 
 Icons are optional but recommended for production builds.
 
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- Built with [Electron](https://www.electronjs.org/)
+- Uses [electron-builder](https://www.electron.build/) for packaging
+- Integrates with [Google Gemini](https://gemini.google.com/)
